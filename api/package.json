@@ -1,0 +1,40 @@
+{
+  "name": "hustlehub-plus-api",
+  "version": "1.0.0",
+  "description": "Secure backend API for the HustleHub+ freelance marketplace",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "jest",
+    "test:api": "newman run ../postman/HustleHub-Part2.postman_collection.json -e ../postman/HustleHub-Local.postman_environment.json --insecure"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "files": [
+    "index.js",
+    "config/",
+    "controllers/",
+    "middleware/",
+    "models/",
+    "routes/",
+    "services/"
+  ],
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.7.0",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.9.4"
+  },
+  "devDependencies": {
+    "jest": "^30.5.2",
+    "newman": "^6.2.3",
+    "nodemon": "^3.1.14"
+  }
+}

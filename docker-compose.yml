@@ -1,0 +1,49 @@
+name: hustlehub-plus
+
+services:
+  mongo:
+    image: mongo:8
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  api:
+    build:
+      context: ./api
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      APP_NAME: HustleHub+
+      PORT: 4000
+      USE_HTTPS: "true"
+      CLIENT_ORIGIN: https://localhost:5173
+      # Defaults to the bundled database. Set MONGO_URI in the root .env file
+      # to point the stack at MongoDB Atlas instead.
+      MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/hustlehub}
+      # No default. The stack refuses to start without a secret rather than
+      # falling back to a predictable one.
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in the root .env file}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+    ports:
+      - "4000:4000"
+
+  client:
+    build:
+      context: ./client
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "5173:5173"
+
+volumes:
+  mongo-data:
