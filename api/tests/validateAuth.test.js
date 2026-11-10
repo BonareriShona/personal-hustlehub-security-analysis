@@ -1,4 +1,7 @@
-const { validateRegistration } = require("../middleware/validateAuth");
+const {
+    validateRegistration,
+    validateLogin
+} = require("../middleware/validateAuth");
 
 /*
  * Unit tests for registration input validation.
@@ -93,6 +96,59 @@ describe("validateRegistration", () => {
         validateRegistration(req, res, next);
 
         expect(next).toHaveBeenCalled();
+        expect(req.body.email).toBe("test@example.com");
+    });
+});
+
+describe("NoSQL injection protection", () => {
+    test("registration rejects a MongoDB operator object as email", () => {
+        const req = {
+            body: {
+                ...validUser(),
+                email: { $ne: null }
+            }
+        };
+
+        const res = mockRes();
+        const next = jest.fn();
+
+        validateRegistration(req, res, next);
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(next).not.toHaveBeenCalled();
+    });
+
+    test("login rejects a MongoDB operator object as email", () => {
+        const req = {
+            body: {
+                email: { $ne: null },
+                password: "Password123"
+            }
+        };
+
+        const res = mockRes();
+        const next = jest.fn();
+
+        validateLogin(req, res, next);
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(next).not.toHaveBeenCalled();
+    });
+
+    test("login accepts a valid email and normalises it", () => {
+        const req = {
+            body: {
+                email: "  Test@Example.COM  ",
+                password: "Password123"
+            }
+        };
+
+        const res = mockRes();
+        const next = jest.fn();
+
+        validateLogin(req, res, next);
+
+        expect(next).toHaveBeenCalledTimes(1);
         expect(req.body.email).toBe("test@example.com");
     });
 });

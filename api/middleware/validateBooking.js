@@ -33,8 +33,12 @@ function validateBooking(req, res, next) {
 /**
  * Validates the :id route parameter.
  */
+
 function validateObjectId(req, res, next) {
-    if (!OBJECT_ID_PATTERN.test(req.params.id)) {
+    if (
+        typeof req.params.id !== "string" ||
+        !OBJECT_ID_PATTERN.test(req.params.id)
+    ) {
         return res.status(400).json({
             success: false,
             message: "Invalid booking ID."
@@ -43,6 +47,7 @@ function validateObjectId(req, res, next) {
 
     next();
 }
+
 
 module.exports = {
     validateBooking,
