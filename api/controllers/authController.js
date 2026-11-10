@@ -9,7 +9,9 @@ const logger = require("../utils/logger");
 const DUMMY_HASH =
     "$2b$12$abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQR";
 
-    
+/**
+ * Validate email input before any MongoDB operation.
+ */
 function isSafeEmail(value) {
     if (
         typeof value !== "string" ||
@@ -33,12 +35,36 @@ function isSafeEmail(value) {
     const domain = value.slice(atIndex + 1);
     const dotIndex = domain.lastIndexOf(".");
 
-    // Require a dot with text on both sides.
     return dotIndex > 0 && dotIndex < domain.length - 1;
 }
 
 /**
- * Generate a signed JSON Web Token (JWT) for an authenticated user.
+ * Return a validated email string or null.
+ *
+ * The allowlist restricts input to characters supported by
+ * this application's email format.
+ *
+ * Reject unsafe input instead of silently modifying it.
+ */
+function getSafeEmail(value) {
+    if (!isSafeEmail(value)) {
+        return null;
+    }
+
+    const sanitized = value.replace(
+        /[^a-zA-Z0-9@._%+-]/g,
+        ""
+    );
+
+    if (sanitized !== value) {
+        return null;
+    }
+
+    return sanitized;
+}
+
+/**
+ * Generate a signed JSON Web Token (JWT).
  */
 function createToken(user) {
     if (!process.env.JWT_SECRET) {
@@ -67,34 +93,40 @@ async function register(req, res, next) {
     try {
         const { name, email, password, role } = req.body;
 
-        if (!isSafeEmail(email)) {
-    return res.status(400).json({
-        success: false,
-        message: "A valid email address is required."
-    });
-}
+        const safeEmail = getSafeEmail(email);
 
-        // Check whether an account already exists.
-        const existingUser = await User.findOne({ email });
+        if (safeEmail === null) {
+            return res.status(400).json({
+                success: false,
+                message: "A valid email address is required."
+            });
+        }
+
+        // Use the validated email for the database query.
+        const existingUser = await User.findOne({
+            email: { $eq: safeEmail }
+        });
 
         if (existingUser) {
             return res.status(409).json({
                 success: false,
-                message: "A user with this email address already exists."
+                message:
+                    "A user with this email address already exists."
             });
         }
 
         // Hash the password before saving the new user.
         const passwordHash = await bcrypt.hash(password, 12);
 
+        // Store the validated email value.
         const newUser = await User.create({
             name,
-            email,
+            email: safeEmail,
             passwordHash,
             role
         });
 
-        // Never include passwords or password hashes in API responses.
+        // Never include passwords or hashes in API responses.
         return res.status(201).json({
             success: true,
             message: "Registration successful.",
@@ -111,7 +143,8 @@ async function register(req, res, next) {
         if (error.code === 11000) {
             return res.status(409).json({
                 success: false,
-                message: "A user with this email address already exists."
+                message:
+                    "A user with this email address already exists."
             });
         }
 
@@ -130,27 +163,37 @@ async function register(req, res, next) {
 /**
  * POST /api/auth/login
  *
- * Authenticates a user and generates a signed JWT.
- * Records successful and failed login attempts using structured logging.
+ * Authenticates users and generates signed JWTs.
+ * Records successful and failed login attempts.
  */
 async function login(req, res, next) {
     try {
         const { email, password } = req.body;
-        if (!isSafeEmail(email)) {
-    return res.status(400).json({
-        success: false,
-        message: "A valid email address is required."
-    });
-}
 
-        // Retrieve the user and explicitly include their password hash.
-        const user = await User.findOne({ email }).select("+passwordHash");
+        const safeEmail = getSafeEmail(email);
 
-        // Perform a password comparison even when the user does not exist
-        // to reduce account enumeration through response timing.
+        if (safeEmail === null) {
+            return res.status(400).json({
+                success: false,
+                message: "A valid email address is required."
+            });
+        }
+
+        // Use the validated email for authentication lookup.
+        const user = await User.findOne({
+            email: { $eq: safeEmail }
+        }).select("+passwordHash");
+
+        // Reduce account enumeration through response timing.
         const passwordMatches = user
-            ? await bcrypt.compare(password, user.passwordHash)
-            : await bcrypt.compare(password, DUMMY_HASH);
+            ? await bcrypt.compare(
+                password,
+                user.passwordHash
+            )
+            : await bcrypt.compare(
+                password,
+                DUMMY_HASH
+            );
 
         // Reject invalid credentials without revealing account existence.
         if (!user || !passwordMatches) {
@@ -170,7 +213,7 @@ async function login(req, res, next) {
         // Generate a JWT for the authenticated user.
         const token = createToken(user);
 
-        // Record successful authentication without logging credentials.
+        // Log success without exposing credentials.
         logger.info("LOGIN_SUCCESS", {
             userId: user._id.toString(),
             role: user.role,

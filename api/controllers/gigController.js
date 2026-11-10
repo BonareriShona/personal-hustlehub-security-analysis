@@ -1,3 +1,4 @@
+
 const mongoose = require("mongoose");
 const Gig = require("../models/Gig");
 
@@ -14,9 +15,8 @@ const Gig = require("../models/Gig");
  */
 async function createGig(req, res, next) {
     try {
-        // Only these four fields are read from the request body. The owner is
-        // taken from the verified JWT, never from client input, so a user
-        // cannot create a gig on somebody else's behalf.
+        // Only these four fields are read from the request body.
+        // The owner comes from the verified JWT, not client input.
         const { title, description, category, price } = req.body;
 
         const gig = await Gig.create({
@@ -68,7 +68,10 @@ async function getGigById(req, res, next) {
     try {
         const { id } = req.params;
 
-        if (!mongoose.isValidObjectId(id)) {
+        if (
+            typeof id !== "string" ||
+            !mongoose.isObjectIdOrHexString(id)
+        ) {
             return res.status(400).json({
                 success: false,
                 message: "Invalid gig ID."
@@ -95,11 +98,28 @@ async function getGigById(req, res, next) {
 
 /**
  * Retrieve gigs belonging to the authenticated freelancer.
+ *
+ * Defence in depth: validate the JWT identity again at the
+ * database-query boundary and construct a typed ObjectId.
  */
 async function getMyGigs(req, res, next) {
     try {
+        const userId = req.user?.userId;
+
+        if (
+            typeof userId !== "string" ||
+            !mongoose.isObjectIdOrHexString(userId)
+        ) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid authentication identity."
+            });
+        }
+
+        const freelancerId = new mongoose.Types.ObjectId(userId);
+
         const gigs = await Gig.find({
-            freelancer: req.user.userId
+            freelancer: freelancerId
         }).sort({ createdAt: -1 });
 
         return res.status(200).json({
@@ -113,17 +133,15 @@ async function getMyGigs(req, res, next) {
 }
 
 /**
- * Update a gig. Ownership is enforced by requireGigOwner, which also
- * attaches the loaded document as req.gig.
+ * Update a gig. Ownership is enforced by requireGigOwner,
+ * which attaches the loaded document as req.gig.
  */
 async function updateGig(req, res, next) {
     try {
         const gig = req.gig;
-
         const { title, description, category, price } = req.body;
 
-        // Only assign fields that were actually supplied. Assigning all four
-        // unconditionally would blank out any the client did not send.
+        // Update only fields provided by the client.
         if (title !== undefined) {
             gig.title = title;
         }
@@ -148,7 +166,6 @@ async function updateGig(req, res, next) {
             gig
         });
     } catch (error) {
-        // Schema validation failures are bad input, not server faults.
         if (error.name === "ValidationError") {
             return res.status(400).json({
                 success: false,
