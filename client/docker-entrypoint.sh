@@ -1,17 +1,27 @@
+
 #!/bin/sh
 set -e
 
-# nginx serves the frontend over HTTPS to match the development server and
-# the API. A self-signed certificate is generated on first run.
+# Generate a development HTTPS certificate without root privileges.
+# Production deployments should use externally managed certificates.
 
-CERT_DIR=/etc/nginx/certs
+CERT_DIR=/tmp/hustlehub-certs
+CERT_FILE="$CERT_DIR/localhost-cert.pem"
+KEY_FILE="$CERT_DIR/localhost-key.pem"
 
-if [ ! -f "$CERT_DIR/localhost-cert.pem" ] || [ ! -f "$CERT_DIR/localhost-key.pem" ]; then
-    echo "No certificate found. Generating a self-signed development certificate."
-    mkdir -p "$CERT_DIR"
+mkdir -p "$CERT_DIR"
+
+if [ ! -f "$CERT_FILE" ] || [ ! -f "$KEY_FILE" ]; then
+    echo "Generating a self-signed development certificate."
+
     openssl req -x509 -newkey rsa:2048 -nodes \
-        -keyout "$CERT_DIR/localhost-key.pem" \
-        -out "$CERT_DIR/localhost-cert.pem" \
+        -keyout "$KEY_FILE" \
+        -out "$CERT_FILE" \
         -days 365 \
         -subj "/CN=localhost" >/dev/null 2>&1
+
+    chmod 600 "$KEY_FILE"
+    chmod 644 "$CERT_FILE"
 fi
+
+echo "Development HTTPS certificate is ready."
