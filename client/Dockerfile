@@ -1,33 +1,43 @@
+
 # syntax=docker/dockerfile:1
 
-# The React application is compiled in a Node stage and the resulting static
-# files are served by nginx. The runtime image therefore contains no Node
-# runtime, no source code and no development dependencies.
+# Build the React application in a separate Node stage.
 FROM node:24-alpine AS build
 
 WORKDIR /app
 
 COPY package.json package-lock.json ./
 
-RUN npm ci
+# Prevent dependency lifecycle scripts during installation.
+RUN npm ci --ignore-scripts
 
 COPY . .
 
+# Explicitly build the production frontend.
 RUN npm run build
 
 
-FROM nginx:1.27-alpine AS runtime
+# Serve the static frontend with non-root Nginx.
+FROM nginxinc/nginx-unprivileged:1.31-alpine AS runtime
+
+# Temporarily use root to install required utilities.
+USER root
 
 RUN apk add --no-cache openssl curl
 
+# Copy Nginx configuration.
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
+# Copy only the compiled frontend.
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Scripts placed here are executed by the nginx image before nginx starts.
+# Generate self-signed HTTPS certificates at startup.
 COPY docker-entrypoint.sh /docker-entrypoint.d/40-generate-certificate.sh
 
-RUN chmod +x /docker-entrypoint.d/40-generate-certificate.sh
+RUN chmod 755 /docker-entrypoint.d/40-generate-certificate.sh
+
+# Nginx and startup scripts run without root privileges.
+USER 101:101
 
 EXPOSE 5173
 
