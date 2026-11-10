@@ -75,7 +75,9 @@ async function register(req, res, next) {
 }
 
         // Check whether an account already exists.
-        const existingUser = await User.findOne({ email });
+        const existingUser = await User.findOne({
+    email: { $eq: email }
+});
 
         if (existingUser) {
             return res.status(409).json({
@@ -144,7 +146,9 @@ async function login(req, res, next) {
 }
 
         // Retrieve the user and explicitly include their password hash.
-        const user = await User.findOne({ email }).select("+passwordHash");
+       const user = await User.findOne({
+    email: { $eq: email }
+}).select("+passwordHash");
 
         // Perform a password comparison even when the user does not exist
         // to reduce account enumeration through response timing.
