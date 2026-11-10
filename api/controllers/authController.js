@@ -9,13 +9,34 @@ const logger = require("../utils/logger");
 const DUMMY_HASH =
     "$2b$12$abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQR";
 
-    function isSafeEmail(value) {
-    return (
-        typeof value === "string" &&
-        value.length <= 254 &&
-        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
-    );
+    
+function isSafeEmail(value) {
+    if (
+        typeof value !== "string" ||
+        value.length === 0 ||
+        value.length > 254 ||
+        /\s/.test(value)
+    ) {
+        return false;
+    }
+
+    const atIndex = value.indexOf("@");
+
+    // Require exactly one @, with text before and after it.
+    if (
+        atIndex <= 0 ||
+        atIndex !== value.lastIndexOf("@")
+    ) {
+        return false;
+    }
+
+    const domain = value.slice(atIndex + 1);
+    const dotIndex = domain.lastIndexOf(".");
+
+    // Require a dot with text on both sides.
+    return dotIndex > 0 && dotIndex < domain.length - 1;
 }
+
 /**
  * Generate a signed JSON Web Token (JWT) for an authenticated user.
  */

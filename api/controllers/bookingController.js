@@ -148,10 +148,20 @@ async function createBooking(req, res, next) {
 /**
  * Bookings made by the authenticated client.
  */
+
 async function getMyBookings(req, res, next) {
     try {
+        const userId = req.user?.userId;
+
+        if (typeof userId !== "string" || !mongoose.isObjectIdOrHexString(userId)) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid authentication identity."
+            });
+        }
+
         const bookings = await Booking.find({
-            client: req.user.userId
+            client: new mongoose.Types.ObjectId(userId)
         }).sort({ createdAt: -1 });
 
         return res.status(200).json({
@@ -167,11 +177,22 @@ async function getMyBookings(req, res, next) {
 /**
  * Bookings placed on the authenticated freelancer's gigs.
  */
+
 async function getReceivedBookings(req, res, next) {
     try {
+        const userId = req.user?.userId;
+
+        if (typeof userId !== "string" || !mongoose.isObjectIdOrHexString(userId)) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid authentication identity."
+            });
+        }
+
         const bookings = await Booking.find({
-            freelancer: req.user.userId
+            freelancer: new mongoose.Types.ObjectId(userId)
         }).sort({ createdAt: -1 });
+
 
         return res.status(200).json({
             success: true,
