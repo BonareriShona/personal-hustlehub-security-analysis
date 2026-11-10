@@ -9,6 +9,13 @@ const logger = require("../utils/logger");
 const DUMMY_HASH =
     "$2b$12$abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQR";
 
+    function isSafeEmail(value) {
+    return (
+        typeof value === "string" &&
+        value.length <= 254 &&
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+    );
+}
 /**
  * Generate a signed JSON Web Token (JWT) for an authenticated user.
  */
@@ -38,6 +45,13 @@ function createToken(user) {
 async function register(req, res, next) {
     try {
         const { name, email, password, role } = req.body;
+
+        if (!isSafeEmail(email)) {
+    return res.status(400).json({
+        success: false,
+        message: "A valid email address is required."
+    });
+}
 
         // Check whether an account already exists.
         const existingUser = await User.findOne({ email });
@@ -101,6 +115,12 @@ async function register(req, res, next) {
 async function login(req, res, next) {
     try {
         const { email, password } = req.body;
+        if (!isSafeEmail(email)) {
+    return res.status(400).json({
+        success: false,
+        message: "A valid email address is required."
+    });
+}
 
         // Retrieve the user and explicitly include their password hash.
         const user = await User.findOne({ email }).select("+passwordHash");
